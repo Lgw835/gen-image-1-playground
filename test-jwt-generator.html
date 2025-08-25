@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT 令牌生成器 - 测试工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .secondary {
+            background: #6c757d;
+        }
+        .secondary:hover {
+            background: #545b62;
+        }
+        .success {
+            background: #28a745;
+        }
+        .success:hover {
+            background: #1e7e34;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .token-output {
+            word-break: break-all;
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+        .url-example {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 JWT 令牌生成器</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            用于测试 gpt-image-1-playground 的JWT认证功能
+        </p>
+
+        <div class="form-group">
+            <label for="userId">用户ID (sub):</label>
+            <input type="text" id="userId" value="user123" placeholder="用户唯一标识">
+        </div>
+
+        <div class="form-group">
+            <label for="userName">用户名 (name):</label>
+            <input type="text" id="userName" value="张三" placeholder="用户显示名称">
+        </div>
+
+        <div class="form-group">
+            <label for="userEmail">邮箱 (email):</label>
+            <input type="email" id="userEmail" value="zhangsan@example.com" placeholder="用户邮箱地址">
+        </div>
+
+        <div class="form-group">
+            <label for="userRole">角色 (role):</label>
+            <select id="userRole">
+                <option value="user">普通用户</option>
+                <option value="admin">管理员</option>
+                <option value="editor">编辑者</option>
+                <option value="viewer">查看者</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="expiryHours">有效期 (小时):</label>
+            <input type="number" id="expiryHours" value="24" min="1" max="8760" placeholder="令牌有效期">
+        </div>
+
+        <div class="form-group">
+            <label for="customFields">自定义字段 (JSON格式):</label>
+            <textarea id="customFields" placeholder='{"department": "IT", "permissions": ["read", "write"]}'></textarea>
+        </div>
+
+        <button onclick="generateToken()">生成 JWT 令牌</button>
+        <button onclick="generateExpiredToken()" class="secondary">生成过期令牌</button>
+        <button onclick="clearForm()" class="secondary">清空表单</button>
+
+        <div id="result" style="display: none;">
+            <h3>生成结果</h3>
+            <div class="token-output" id="tokenOutput"></div>
+            
+            <h4>测试URL:</h4>
+            <div class="url-example" id="urlExample"></div>
+            
+            <button onclick="copyToken()" class="success">复制令牌</button>
+            <button onclick="copyUrl()" class="success">复制URL</button>
+            <button onclick="openInNewTab()" class="success">在新标签页中打开</button>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ 注意:</strong> 这是一个测试工具，生成的JWT令牌没有签名验证。在生产环境中，请使用适当的密钥签名JWT令牌。
+        </div>
+    </div>
+
+    <script>
+        let generatedToken = '';
+        let generatedUrl = '';
+
+        function base64UrlEncode(str) {
+            return btoa(str)
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        }
+
+        function generateToken(expired = false) {
+            const header = {
+                "alg": "HS256",
+                "typ": "JWT"
+            };
+
+            const now = Math.floor(Date.now() / 1000);
+            const expiryHours = expired ? -1 : parseInt(document.getElementById('expiryHours').value) || 24;
+            
+            const payload = {
+                sub: document.getElementById('userId').value || 'user123',
+                name: document.getElementById('userName').value || '张三',
+                email: document.getElementById('userEmail').value || 'zhangsan@example.com',
+                role: document.getElementById('userRole').value || 'user',
+                iat: now,
+                exp: now + (expiryHours * 3600)
+            };
+
+            // 添加自定义字段
+            const customFields = document.getElementById('customFields').value.trim();
+            if (customFields) {
+                try {
+                    const custom = JSON.parse(customFields);
+                    Object.assign(payload, custom);
+                } catch (e) {
+                    alert('自定义字段JSON格式错误: ' + e.message);
+                    return;
+                }
+            }
+
+            // 生成JWT (header.payload.signature)
+            const headerEncoded = base64UrlEncode(JSON.stringify(header));
+            const payloadEncoded = base64UrlEncode(JSON.stringify(payload));
+            const signature = base64UrlEncode('fake-signature-for-testing'); // 假签名，仅用于测试
+
+            generatedToken = `${headerEncoded}.${payloadEncoded}.${signature}`;
+            generatedUrl = `http://localhost:3301/?token=${encodeURIComponent(generatedToken)}`;
+
+            // 显示结果
+            document.getElementById('tokenOutput').textContent = generatedToken;
+            document.getElementById('urlExample').textContent = generatedUrl;
+            document.getElementById('result').style.display = 'block';
+
+            console.log('Generated JWT Payload:', payload);
+        }
+
+        function generateExpiredToken() {
+            generateToken(true);
+        }
+
+        function copyToken() {
+            navigator.clipboard.writeText(generatedToken).then(() => {
+                alert('令牌已复制到剪贴板！');
+            });
+        }
+
+        function copyUrl() {
+            navigator.clipboard.writeText(generatedUrl).then(() => {
+                alert('URL已复制到剪贴板！');
+            });
+        }
+
+        function openInNewTab() {
+            window.open(generatedUrl, '_blank');
+        }
+
+        function clearForm() {
+            document.getElementById('userId').value = 'user123';
+            document.getElementById('userName').value = '张三';
+            document.getElementById('userEmail').value = 'zhangsan@example.com';
+            document.getElementById('userRole').value = 'user';
+            document.getElementById('expiryHours').value = '24';
+            document.getElementById('customFields').value = '';
+            document.getElementById('result').style.display = 'none';
+        }
+
+        // 页面加载时生成一个默认令牌
+        window.onload = function() {
+            generateToken();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,469 @@
+'use client';
+
+import type { HistoryMetadata } from '@/app/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+    DialogClose
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import {
+    Copy,
+    Check,
+    Layers,
+    Coins,
+    Pencil,
+    Sparkles as SparklesIcon,
+    HardDrive,
+    Database,
+    FileImage,
+    Trash2
+} from 'lucide-react';
+import { formatPointsDisplay, convertUsdToPoints } from '@/lib/points-utils';
+import Image from 'next/image';
+import * as React from 'react';
+
+type HistoryPanelProps = {
+    history: HistoryMetadata[];
+    onSelectImage: (item: HistoryMetadata) => void;
+    onClearHistory: () => void;
+    getImageSrc: (filename: string) => string | undefined;
+    onDeleteItemRequest: (item: HistoryMetadata) => void;
+    itemPendingDeleteConfirmation: HistoryMetadata | null;
+    onConfirmDeletion: () => void;
+    onCancelDeletion: () => void;
+    deletePreferenceDialogValue: boolean;
+    onDeletePreferenceDialogChange: (isChecked: boolean) => void;
+};
+
+const formatDuration = (ms: number): string => {
+    if (ms < 1000) {
+        return `${ms}ms`;
+    }
+    return `${(ms / 1000).toFixed(1)}s`;
+};
+
+const calculateCost = (value: number, rate: number): string => {
+    const cost = value * rate;
+    return isNaN(cost) ? 'N/A' : cost.toFixed(4);
+};
+
+export function HistoryPanel({
+    history,
+    onSelectImage,
+    onClearHistory,
+    getImageSrc,
+    onDeleteItemRequest,
+    itemPendingDeleteConfirmation,
+    onConfirmDeletion,
+    onCancelDeletion,
+    deletePreferenceDialogValue,
+    onDeletePreferenceDialogChange
+}: HistoryPanelProps) {
+    const [openPromptDialogTimestamp, setOpenPromptDialogTimestamp] = React.useState<number | null>(null);
+    const [openPointsDialogTimestamp, setOpenPointsDialogTimestamp] = React.useState<number | null>(null);
+    const [isTotalPointsDialogOpen, setIsTotalPointsDialogOpen] = React.useState(false);
+    const [copiedTimestamp, setCopiedTimestamp] = React.useState<number | null>(null);
+
+    const { totalPoints, totalImages } = React.useMemo(() => {
+        let points = 0;
+        let images = 0;
+        history.forEach((item) => {
+            // 优先使用新的积分字段
+            if (item.pointsUsed) {
+                points += item.pointsUsed;
+            } else if (item.costDetails) {
+                // 向后兼容：将美元转换为积分
+                points += convertUsdToPoints(item.costDetails.estimated_cost_usd);
+            }
+            images += item.images?.length ?? 0;
+        });
+
+        return { totalPoints: points, totalImages: images };
+    }, [history]);
+
+    const averagePoints = totalImages > 0 ? Math.round(totalPoints / totalImages) : 0;
+
+    const handleCopy = async (text: string | null | undefined, timestamp: number) => {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedTimestamp(timestamp);
+            setTimeout(() => setCopiedTimestamp(null), 1500);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
+
+    return (
+        <Card className='flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-black'>
+            <CardHeader className='flex flex-row items-center justify-between gap-4 border-b border-white/10 px-4 py-3'>
+                <div className='flex items-center gap-2'>
+                    <CardTitle className='text-lg font-medium text-white'>历史记录</CardTitle>
+                    {totalPoints > 0 && (
+                        <Dialog open={isTotalPointsDialogOpen} onOpenChange={setIsTotalPointsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <button
+                                    className='mt-0.5 flex items-center gap-1 rounded-full bg-blue-600/80 px-1.5 py-0.5 text-[12px] text-white transition-colors hover:bg-blue-500/90'
+                                    aria-label='显示总积分摘要'>
+                                    总积分: {formatPointsDisplay(totalPoints)}
+                                </button>
+                            </DialogTrigger>
+                            <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-[450px]'>
+                                <DialogHeader>
+                                    <DialogTitle className='text-white'>总积分摘要</DialogTitle>
+                                    {/* Add sr-only description for accessibility */}
+                                    <DialogDescription className='sr-only'>
+                                        所有图像生成的总积分消耗统计。
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className='space-y-1 pt-1 text-xs text-neutral-400'>
+                                    <p>积分消耗标准:</p>
+                                    <ul className='list-disc pl-4'>
+                                        <li>低质量: 20积分/张</li>
+                                        <li>标准质量: 80积分/张</li>
+                                        <li>高质量: 140积分/张</li>
+                                    </ul>
+                                </div>
+                                <div className='space-y-2 py-4 text-sm text-neutral-300'>
+                                    <div className='flex justify-between'>
+                                        <span>生成的图像总数:</span> <span>{totalImages.toLocaleString()}</span>
+                                    </div>
+                                    <div className='flex justify-between'>
+                                        <span>每张图像平均积分:</span> <span>{formatPointsDisplay(averagePoints)}</span>
+                                    </div>
+                                    <hr className='my-2 border-neutral-700' />
+                                    <div className='flex justify-between font-medium text-white'>
+                                        <span>总积分消耗:</span>
+                                        <span>{formatPointsDisplay(totalPoints)}</span>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button
+                                            type='button'
+                                            variant='secondary'
+                                            size='sm'
+                                            className='bg-neutral-700 text-neutral-200 hover:bg-neutral-600'>
+                                            关闭
+                                        </Button>
+                                    </DialogClose>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                </div>
+                {history.length > 0 && (
+                    <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={onClearHistory}
+                        className='h-auto rounded-md px-2 py-1 text-white/60 hover:bg-white/10 hover:text-white'>
+                        清除
+                    </Button>
+                )}
+            </CardHeader>
+            <CardContent className='flex-grow overflow-y-auto p-4'>
+                {history.length === 0 ? (
+                    <div className='flex h-full items-center justify-center text-white/40'>
+                        <p>生成的图像将显示在这里。</p>
+                    </div>
+                ) : (
+                    <div className='grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'>
+                        {[...history].map((item) => {
+                            const firstImage = item.images?.[0];
+                            const imageCount = item.images?.length ?? 0;
+                            const isMultiImage = imageCount > 1;
+                            const itemKey = item.timestamp;
+                            const originalStorageMode = item.storageModeUsed || 'fs';
+                            const outputFormat = item.output_format || 'png';
+
+                            let thumbnailUrl: string | undefined;
+                            if (firstImage) {
+                                if (originalStorageMode === 'indexeddb') {
+                                    thumbnailUrl = getImageSrc(firstImage.filename);
+                                } else {
+                                    thumbnailUrl = `/api/image/${firstImage.filename}`;
+                                }
+                            }
+
+                            return (
+                                <div key={itemKey} className='flex flex-col'>
+                                    <div className='group relative'>
+                                        <button
+                                            onClick={() => onSelectImage(item)}
+                                            className='relative block aspect-square w-full overflow-hidden rounded-t-md border border-white/20 transition-all duration-150 group-hover:border-white/40 focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black focus:outline-none'
+                                            aria-label={`查看来自 ${new Date(item.timestamp).toLocaleString()} 的图像批次`}>
+                                            {thumbnailUrl ? (
+                                                <Image
+                                                    src={thumbnailUrl}
+                                                    alt={`Preview for batch generated at ${new Date(item.timestamp).toLocaleString()}`}
+                                                    width={150}
+                                                    height={150}
+                                                    className='h-full w-full object-cover'
+                                                    unoptimized
+                                                />
+                                            ) : (
+                                                <div className='flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500'>
+                                                    ?
+                                                </div>
+                                            )}
+                                            <div
+                                                className={cn(
+                                                    'pointer-events-none absolute top-1 left-1 z-10 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] text-white',
+                                                    item.mode === 'edit' ? 'bg-orange-600/80' : 'bg-blue-600/80'
+                                                )}>
+                                                {item.mode === 'edit' ? (
+                                                    <Pencil size={12} />
+                                                ) : (
+                                                    <SparklesIcon size={12} />
+                                                )}
+                                                {item.mode === 'edit' ? 'Edit' : 'Create'}
+                                            </div>
+                                            {isMultiImage && (
+                                                <div className='pointer-events-none absolute right-1 bottom-1 z-10 flex items-center gap-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[12px] text-white'>
+                                                    <Layers size={16} />
+                                                    {imageCount}
+                                                </div>
+                                            )}
+                                            <div className='pointer-events-none absolute bottom-1 left-1 z-10 flex items-center gap-1'>
+                                                <div className='flex items-center gap-1 rounded-full border border-white/10 bg-neutral-900/80 px-1 py-0.5 text-[11px] text-white/70'>
+                                                    {originalStorageMode === 'fs' ? (
+                                                        <HardDrive size={12} className='text-neutral-400' />
+                                                    ) : (
+                                                        <Database size={12} className='text-blue-400' />
+                                                    )}
+                                                    <span>{originalStorageMode === 'fs' ? 'file' : 'db'}</span>
+                                                </div>
+                                                {item.output_format && (
+                                                    <div className='flex items-center gap-1 rounded-full border border-white/10 bg-neutral-900/80 px-1 py-0.5 text-[11px] text-white/70'>
+                                                        <FileImage size={12} className='text-neutral-400' />
+                                                        <span>{outputFormat.toUpperCase()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </button>
+                                        {(item.pointsUsed || item.costDetails) && (
+                                            <Dialog
+                                                open={openPointsDialogTimestamp === itemKey}
+                                                onOpenChange={(isOpen) => !isOpen && setOpenPointsDialogTimestamp(null)}>
+                                                <DialogTrigger asChild>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setOpenPointsDialogTimestamp(itemKey);
+                                                        }}
+                                                        className='absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-full bg-blue-600/80 px-1.5 py-0.5 text-[11px] text-white transition-colors hover:bg-blue-500/90'
+                                                        aria-label='显示积分消耗详情'>
+                                                        <Coins size={12} />
+                                                        {item.pointsUsed ? formatPointsDisplay(item.pointsUsed) : formatPointsDisplay(convertUsdToPoints(item.costDetails!.estimated_cost_usd))}
+                                                    </button>
+                                                </DialogTrigger>
+                                                <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-[450px]'>
+                                                    <DialogHeader>
+                                                        <DialogTitle className='text-white'>积分消耗详情</DialogTitle>
+                                                        <DialogDescription className='sr-only'>
+                                                            此次图像生成的积分消耗详情。
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className='space-y-1 pt-1 text-xs text-neutral-400'>
+                                                        <p>积分消耗标准:</p>
+                                                        <ul className='list-disc pl-4'>
+                                                            <li>低质量: 20积分/张</li>
+                                                            <li>标准质量: 80积分/张</li>
+                                                            <li>高质量: 140积分/张</li>
+                                                        </ul>
+                                                    </div>
+                                                    <div className='space-y-2 py-4 text-sm text-neutral-300'>
+                                                        <div className='flex justify-between'>
+                                                            <span>图像质量:</span>
+                                                            <span>{item.quality}</span>
+                                                        </div>
+                                                        <div className='flex justify-between'>
+                                                            <span>图像数量:</span>
+                                                            <span>{item.images?.length || 1}张</span>
+                                                        </div>
+                                                        <div className='flex justify-between'>
+                                                            <span>单张积分:</span>
+                                                            <span>
+                                                                {item.pointsUsed
+                                                                    ? formatPointsDisplay(Math.round(item.pointsUsed / (item.images?.length || 1)))
+                                                                    : item.costDetails
+                                                                        ? formatPointsDisplay(Math.round(convertUsdToPoints(item.costDetails.estimated_cost_usd) / (item.images?.length || 1)))
+                                                                        : '未知'
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <hr className='my-2 border-neutral-700' />
+                                                        <div className='flex justify-between font-medium text-white'>
+                                                            <span>总积分消耗:</span>
+                                                            <span>
+                                                                {item.pointsUsed
+                                                                    ? formatPointsDisplay(item.pointsUsed)
+                                                                    : item.costDetails
+                                                                        ? formatPointsDisplay(convertUsdToPoints(item.costDetails.estimated_cost_usd))
+                                                                        : '未知'
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <DialogClose asChild>
+                                                            <Button
+                                                                type='button'
+                                                                variant='secondary'
+                                                                size='sm'
+                                                                className='bg-neutral-700 text-neutral-200 hover:bg-neutral-600'>
+                                                                关闭
+                                                            </Button>
+                                                        </DialogClose>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
+                                    </div>
+
+                                    <div className='space-y-1 rounded-b-md border border-t-0 border-neutral-700 bg-black p-2 text-xs text-white/60'>
+                                        <p title={`Generated on: ${new Date(item.timestamp).toLocaleString()}`}>
+                                            <span className='font-medium text-white/80'>Time:</span>{' '}
+                                            {formatDuration(item.durationMs)}
+                                        </p>
+                                        <p>
+                                            <span className='font-medium text-white/80'>Quality:</span> {item.quality}
+                                        </p>
+                                        <p>
+                                            <span className='font-medium text-white/80'>BG:</span> {item.background}
+                                        </p>
+                                        <p>
+                                            <span className='font-medium text-white/80'>Mod:</span> {item.moderation}
+                                        </p>
+                                        <div className='mt-2 flex items-center gap-1'>
+                                            <Dialog
+                                                open={openPromptDialogTimestamp === itemKey}
+                                                onOpenChange={(isOpen) =>
+                                                    !isOpen && setOpenPromptDialogTimestamp(null)
+                                                }>
+                                                <DialogTrigger asChild>
+                                                    <Button
+                                                        variant='outline'
+                                                        size='sm'
+                                                        className='h-6 flex-grow border-white/20 px-2 py-1 text-xs text-white/70 hover:bg-white/10 hover:text-white'
+                                                        onClick={() => setOpenPromptDialogTimestamp(itemKey)}>
+                                                        Show Prompt
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-[625px]'>
+                                                    <DialogHeader>
+                                                        <DialogTitle className='text-white'>Prompt</DialogTitle>
+                                                        <DialogDescription className='sr-only'>
+                                                            The full prompt used to generate this image batch.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className='max-h-[400px] overflow-y-auto rounded-md border border-neutral-600 bg-neutral-800 p-3 py-4 text-sm text-neutral-300'>
+                                                        {item.prompt || 'No prompt recorded.'}
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button
+                                                            variant='outline'
+                                                            size='sm'
+                                                            onClick={() => handleCopy(item.prompt, itemKey)}
+                                                            className='border-neutral-600 text-neutral-300 hover:bg-neutral-700 hover:text-white'>
+                                                            {copiedTimestamp === itemKey ? (
+                                                                <Check className='mr-2 h-4 w-4 text-green-400' />
+                                                            ) : (
+                                                                <Copy className='mr-2 h-4 w-4' />
+                                                            )}
+                                                            {copiedTimestamp === itemKey ? '已复制！' : '复制'}
+                                                        </Button>
+                                                        <DialogClose asChild>
+                                                            <Button
+                                                                type='button'
+                                                                variant='secondary'
+                                                                size='sm'
+                                                                className='bg-neutral-700 text-neutral-200 hover:bg-neutral-600'>
+                                                                关闭
+                                                            </Button>
+                                                        </DialogClose>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                            <Dialog
+                                                open={itemPendingDeleteConfirmation?.timestamp === item.timestamp}
+                                                onOpenChange={(isOpen) => {
+                                                    if (!isOpen) onCancelDeletion();
+                                                }}>
+                                                <DialogTrigger asChild>
+                                                    <Button
+                                                        className='h-6 w-6 bg-red-700/60 text-white hover:bg-red-600/60'
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onDeleteItemRequest(item);
+                                                        }}
+                                                        aria-label='删除历史记录项'>
+                                                        <Trash2 size={14} />
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className='border-neutral-700 bg-neutral-900 text-white sm:max-w-md'>
+                                                    <DialogHeader>
+                                                        <DialogTitle className='text-white'>
+                                                            确认删除
+                                                        </DialogTitle>
+                                                        <DialogDescription className='pt-2 text-neutral-300'>
+                                                            您确定要删除此历史记录条目吗？这将删除 {item.images.length} 张图像。此操作
+                                                            无法撤销。
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className='flex items-center space-x-2 py-2'>
+                                                        <Checkbox
+                                                            id={`dont-ask-${item.timestamp}`}
+                                                            checked={deletePreferenceDialogValue}
+                                                            onCheckedChange={(checked) =>
+                                                                onDeletePreferenceDialogChange(!!checked)
+                                                            }
+                                                            className='border-neutral-400 bg-white data-[state=checked]:border-neutral-700 data-[state=checked]:bg-white data-[state=checked]:text-black dark:border-neutral-500 dark:!bg-white'
+                                                        />
+                                                        <label
+                                                            htmlFor={`dont-ask-${item.timestamp}`}
+                                                            className='text-sm leading-none font-medium text-neutral-300 peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
+                                                            不再询问
+                                                        </label>
+                                                    </div>
+                                                    <DialogFooter className='gap-2 sm:justify-end'>
+                                                        <Button
+                                                            type='button'
+                                                            variant='outline'
+                                                            size='sm'
+                                                            onClick={onCancelDeletion}
+                                                            className='border-neutral-600 text-neutral-300 hover:bg-neutral-700 hover:text-white'>
+                                                            取消
+                                                        </Button>
+                                                        <Button
+                                                            type='button'
+                                                            variant='destructive'
+                                                            size='sm'
+                                                            onClick={onConfirmDeletion}
+                                                            className='bg-red-600 text-white hover:bg-red-500'>
+                                                            删除
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
