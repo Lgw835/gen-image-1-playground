@@ -223,7 +223,6 @@ export async function POST(request: NextRequest) {
                 };
 
                 // 只在非Vercel环境中设置本地文件路径
-                const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
                 if (effectiveStorageMode === 'fs' && !isVercel) {
                     imageResult.path = `/api/image/${filename}`;
                 }
