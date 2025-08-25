@@ -41,6 +41,14 @@ function validateOutputFormat(format: unknown): ValidOutputFormat {
 }
 
 async function ensureOutputDirExists() {
+    // 检查是否在Vercel环境中运行
+    const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+
+    if (isVercel) {
+        console.log('Running in Vercel environment, skipping directory creation');
+        return; // 在Vercel中跳过目录创建，因为文件系统是只读的
+    }
+
     try {
         await fs.access(outputDir);
     } catch (error: unknown) {
@@ -196,11 +204,16 @@ export async function POST(request: NextRequest) {
                 const fileExtension = validateOutputFormat(formData.get('output_format'));
                 const filename = `${timestamp}-${index}.${fileExtension}`;
 
-                if (effectiveStorageMode === 'fs') {
+                // 检查是否在Vercel环境中运行
+                const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+
+                if (effectiveStorageMode === 'fs' && !isVercel) {
                     const filepath = path.join(outputDir, filename);
                     console.log(`Attempting to save image to: ${filepath}`);
                     await fs.writeFile(filepath, buffer);
                     console.log(`Successfully saved image: ${filename}`);
+                } else if (isVercel) {
+                    console.log(`Skipping local file save in Vercel environment: ${filename}`);
                 }
 
                 const imageResult: { filename: string; b64_json: string; path?: string; output_format: string } = {
@@ -209,7 +222,9 @@ export async function POST(request: NextRequest) {
                     output_format: fileExtension
                 };
 
-                if (effectiveStorageMode === 'fs') {
+                // 只在非Vercel环境中设置本地文件路径
+                const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+                if (effectiveStorageMode === 'fs' && !isVercel) {
                     imageResult.path = `/api/image/${filename}`;
                 }
 
