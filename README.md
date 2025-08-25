@@ -97,7 +97,9 @@
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `OPENAI_API_BASE_URL` | 自定义OpenAI兼容API端点 | OpenAI默认端点 |
-| `APP_PASSWORD` | 应用访问密码 | - |
+| `APP_PASSWORD` | 应用访问密码（密码保护模式） | - |
+| `DIRECT_CONFIG_MODE` | 启用直接配置模式 | `false` |
+| `ALLOWED_ORIGINS` | 直接配置模式下允许的来源域名（逗号分隔） | - |
 | `HTTP_PROXY` / `HTTPS_PROXY` | 代理服务器配置 | - |
 
 ## 🛠️ 本地开发
@@ -164,7 +166,11 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_API_BASE_URL=https://your-compatible-api-endpoint.com
 ```
 
-### 密码保护
+### 认证配置
+
+应用支持两种认证模式：
+
+#### 1. 密码保护模式（默认）
 设置应用访问密码以增加安全性：
 
 ```dotenv
@@ -172,6 +178,23 @@ APP_PASSWORD=your_secure_password_here
 ```
 
 设置后，前端会要求输入密码才能访问应用。
+
+#### 2. 直接配置模式
+启用直接配置模式，无需密码，直接使用环境变量中的API密钥：
+
+```dotenv
+DIRECT_CONFIG_MODE=true
+OPENAI_API_KEY=your_openai_api_key_here
+# 可选：限制允许的来源域名
+ALLOWED_ORIGINS=https://yourdomain.com,https://anotherdomain.com
+```
+
+**直接配置模式特点：**
+- 无需设置或输入密码
+- API密钥直接从环境变量读取
+- 可选择性限制请求来源域名
+- 适合Vercel等云平台部署
+- 更简化的配置流程
 
 ### 代理配置
 如果需要通过代理访问OpenAI API：

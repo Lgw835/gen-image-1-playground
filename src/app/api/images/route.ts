@@ -61,10 +61,6 @@ async function ensureOutputDirExists() {
     }
 }
 
-function sha256(data: string): string {
-    return crypto.createHash('sha256').update(data).digest('hex');
-}
-
 export async function POST(request: NextRequest) {
     console.log('Received POST request to /api/images');
 
@@ -72,7 +68,21 @@ export async function POST(request: NextRequest) {
         console.error('OPENAI_API_KEY is not set.');
         return NextResponse.json({ error: 'Server configuration error: API key not found.' }, { status: 500 });
     }
+    
     try {
+        // 验证JWT token
+        const authHeader = request.headers.get('authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            console.error('Missing or invalid authorization header.');
+            return NextResponse.json({ error: 'Unauthorized: Missing or invalid token.' }, { status: 401 });
+        }
+
+        const token = authHeader.substring(7); // 移除 "Bearer " 前缀
+        if (!token) {
+            console.error('Missing JWT token.');
+            return NextResponse.json({ error: 'Unauthorized: Missing token.' }, { status: 401 });
+        }
+
         // 简化存储模式，只使用文件系统模式
         const effectiveStorageMode: 'fs' = 'fs';
         console.log(`Effective Image Storage Mode: ${effectiveStorageMode}`);
@@ -81,19 +91,6 @@ export async function POST(request: NextRequest) {
         await ensureOutputDirExists();
 
         const formData = await request.formData();
-
-        if (process.env.APP_PASSWORD) {
-            const clientPasswordHash = formData.get('passwordHash') as string | null;
-            if (!clientPasswordHash) {
-                console.error('Missing password hash.');
-                return NextResponse.json({ error: 'Unauthorized: Missing password hash.' }, { status: 401 });
-            }
-            const serverPasswordHash = sha256(process.env.APP_PASSWORD);
-            if (clientPasswordHash !== serverPasswordHash) {
-                console.error('Invalid password hash.');
-                return NextResponse.json({ error: 'Unauthorized: Invalid password.' }, { status: 401 });
-            }
-        }
 
         const mode = formData.get('mode') as 'generate' | 'edit' | null;
         const prompt = formData.get('prompt') as string | null;

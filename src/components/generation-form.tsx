@@ -19,8 +19,6 @@ import {
     Tally3,
     Loader2,
     BrickWall,
-    Lock,
-    LockOpen,
     Coins
 } from 'lucide-react';
 import { calculatePointsFromFormData, formatPointsDisplay } from '@/lib/points-utils';
@@ -42,9 +40,6 @@ type GenerationFormProps = {
     isLoading: boolean;
     currentMode: 'generate' | 'edit';
     onModeChange: (mode: 'generate' | 'edit') => void;
-    isPasswordRequiredByBackend: boolean | null;
-    clientPasswordHash: string | null;
-    onOpenPasswordDialog: () => void;
     prompt: string;
     setPrompt: React.Dispatch<React.SetStateAction<string>>;
     n: number[];
@@ -92,9 +87,6 @@ export function GenerationForm({
     isLoading,
     currentMode,
     onModeChange,
-    isPasswordRequiredByBackend,
-    clientPasswordHash,
-    onOpenPasswordDialog,
     prompt,
     setPrompt,
     n,
@@ -137,16 +129,7 @@ export function GenerationForm({
                 <div>
                     <div className='flex items-center'>
                         <CardTitle className='py-1 text-lg font-medium text-white'>生成图像</CardTitle>
-                        {isPasswordRequiredByBackend && (
-                            <Button
-                                variant='ghost'
-                                size='icon'
-                                onClick={onOpenPasswordDialog}
-                                className='ml-2 text-white/60 hover:text-white'
-                                aria-label='配置密码'>
-                                {clientPasswordHash ? <Lock className='h-4 w-4' /> : <LockOpen className='h-4 w-4' />}
-                            </Button>
-                        )}
+                        {/* 密码配置按钮已移除 - 现在使用JWT令牌认证 */}
                     </div>
 
                 </div>

@@ -4,7 +4,6 @@ import { EditingForm, type EditingFormData } from '@/components/editing-form';
 import { GenerationForm, type GenerationFormData } from '@/components/generation-form';
 import { ApiHistoryPanel } from '@/components/api-history-panel';
 import { ImageOutput } from '@/components/image-output';
-import { PasswordDialog } from '@/components/password-dialog';
 import { AutoAuthErrorDialog } from '@/components/auth-error-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateApiCost, type CostDetails } from '@/lib/cost-utils';
@@ -65,8 +64,6 @@ export default function HomePage() {
     const { isAuthenticated, authError, pointsBalance, deductPoints, token, getAuthHeaders } = useAuth();
 
     const [mode, setMode] = React.useState<'generate' | 'edit'>('generate');
-    const [isPasswordRequiredByBackend, setIsPasswordRequiredByBackend] = React.useState<boolean | null>(null);
-    const [clientPasswordHash, setClientPasswordHash] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [isSendingToEdit, setIsSendingToEdit] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
@@ -76,9 +73,6 @@ export default function HomePage() {
     const [history, setHistory] = React.useState<HistoryMetadata[]>([]);
     const [isInitialLoad, setIsInitialLoad] = React.useState(true);
     const [blobUrlCache, setBlobUrlCache] = React.useState<Record<string, string>>({});
-    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = React.useState(false);
-    const [passwordDialogContext, setPasswordDialogContext] = React.useState<'initial' | 'retry'>('initial');
-    const [lastApiCallArgs, setLastApiCallArgs] = React.useState<[GenerationFormData | EditingFormData] | null>(null);
     const [skipDeleteConfirmation, setSkipDeleteConfirmation] = React.useState<boolean>(false);
     const [itemToDeleteConfirm, setItemToDeleteConfirm] = React.useState<HistoryMetadata | null>(null);
     const [dialogCheckboxStateSkipConfirm, setDialogCheckboxStateSkipConfirm] = React.useState<boolean>(false);
@@ -164,27 +158,7 @@ export default function HomePage() {
         setIsInitialLoad(false);
     }, []);
 
-    React.useEffect(() => {
-        const fetchAuthStatus = async () => {
-            try {
-                const response = await fetch('/api/auth-status');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch auth status');
-                }
-                const data = await response.json();
-                setIsPasswordRequiredByBackend(data.passwordRequired);
-            } catch (error) {
-                console.error('Error fetching auth status:', error);
-                setIsPasswordRequiredByBackend(false);
-            }
-        };
-
-        fetchAuthStatus();
-        const storedHash = localStorage.getItem('clientPasswordHash');
-        if (storedHash) {
-            setClientPasswordHash(storedHash);
-        }
-    }, []);
+    // 移除了密码相关的认证状态检查
 
     React.useEffect(() => {
         if (!isInitialLoad) {
@@ -258,40 +232,7 @@ export default function HomePage() {
         };
     }, [mode, editImageFiles.length]);
 
-    async function sha256Client(text: string): Promise<string> {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(text);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-        return hashHex;
-    }
 
-    const handleSavePassword = async (password: string) => {
-        if (!password.trim()) {
-            setError('密码不能为空。');
-            return;
-        }
-        try {
-            const hash = await sha256Client(password);
-            localStorage.setItem('clientPasswordHash', hash);
-            setClientPasswordHash(hash);
-            setError(null);
-            setIsPasswordDialogOpen(false);
-            if (passwordDialogContext === 'retry' && lastApiCallArgs) {
-                console.log('Retrying API call after password save...');
-                await handleApiCall(...lastApiCallArgs);
-            }
-        } catch (e) {
-            console.error('Error hashing password:', e);
-            setError('由于哈希错误，无法保存密码。');
-        }
-    };
-
-    const handleOpenPasswordDialog = () => {
-        setPasswordDialogContext('initial');
-        setIsPasswordDialogOpen(true);
-    };
 
     const getMimeTypeFromFormat = (format: string): string => {
         if (format === 'jpeg') return 'image/jpeg';
@@ -332,15 +273,6 @@ export default function HomePage() {
         setImageOutputView('grid');
 
         const apiFormData = new FormData();
-        if (isPasswordRequiredByBackend && clientPasswordHash) {
-            apiFormData.append('passwordHash', clientPasswordHash);
-        } else if (isPasswordRequiredByBackend && !clientPasswordHash) {
-            setError('需要密码。请点击锁定图标配置密码。');
-            setPasswordDialogContext('initial');
-            setIsPasswordDialogOpen(true);
-            setIsLoading(false);
-            return;
-        }
         apiFormData.append('mode', mode);
 
         if (mode === 'generate') {
@@ -377,18 +309,17 @@ export default function HomePage() {
         try {
             const response = await fetch('/api/images', {
                 method: 'POST',
+                headers: {
+                    ...getAuthHeaders()
+                },
                 body: apiFormData
             });
 
             const result = await response.json();
 
             if (!response.ok) {
-                if (response.status === 401 && isPasswordRequiredByBackend) {
-                    setError('未授权：密码无效或缺失。请重试。');
-                    setPasswordDialogContext('retry');
-                    setLastApiCallArgs([formData]);
-                    setIsPasswordDialogOpen(true);
-
+                if (response.status === 401) {
+                    setError('未授权：用户身份验证失败，请刷新页面重新登录。');
                     return;
                 }
                 throw new Error(result.error || `API 请求失败，状态码 ${response.status}`);
@@ -808,17 +739,7 @@ export default function HomePage() {
                 </div>
             )}
 
-            <PasswordDialog
-                isOpen={isPasswordDialogOpen}
-                onOpenChange={setIsPasswordDialogOpen}
-                onSave={handleSavePassword}
-                title={passwordDialogContext === 'retry' ? 'Password Required' : 'Configure Password'}
-                description={
-                    passwordDialogContext === 'retry'
-                        ? 'The server requires a password, or the previous one was incorrect. Please enter it to continue.'
-                        : 'Set a password to use for API requests.'
-                }
-            />
+            {/* 移除了密码对话框 */}
             <div className='w-full max-w-7xl space-y-6'>
                 <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
                     <div className='relative flex h-[70vh] min-h-[600px] flex-col lg:col-span-1'>
@@ -828,9 +749,6 @@ export default function HomePage() {
                                 isLoading={isLoading}
                                 currentMode={mode}
                                 onModeChange={setMode}
-                                isPasswordRequiredByBackend={isPasswordRequiredByBackend}
-                                clientPasswordHash={clientPasswordHash}
-                                onOpenPasswordDialog={handleOpenPasswordDialog}
                                 prompt={genPrompt}
                                 setPrompt={setGenPrompt}
                                 n={genN}
@@ -855,9 +773,6 @@ export default function HomePage() {
                                 isLoading={isLoading || isSendingToEdit}
                                 currentMode={mode}
                                 onModeChange={setMode}
-                                isPasswordRequiredByBackend={isPasswordRequiredByBackend}
-                                clientPasswordHash={clientPasswordHash}
-                                onOpenPasswordDialog={handleOpenPasswordDialog}
                                 imageFiles={editImageFiles}
                                 sourceImagePreviewUrls={editSourceImagePreviewUrls}
                                 setImageFiles={setEditImageFiles}

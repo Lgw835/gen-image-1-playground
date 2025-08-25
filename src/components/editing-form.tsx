@@ -23,8 +23,6 @@ import {
     X,
     ScanEye,
     UploadCloud,
-    Lock,
-    LockOpen,
     Coins
 } from 'lucide-react';
 import { calculatePointsFromFormData, formatPointsDisplay } from '@/lib/points-utils';
@@ -51,9 +49,6 @@ type EditingFormProps = {
     isLoading: boolean;
     currentMode: 'generate' | 'edit';
     onModeChange: (mode: 'generate' | 'edit') => void;
-    isPasswordRequiredByBackend: boolean | null;
-    clientPasswordHash: string | null;
-    onOpenPasswordDialog: () => void;
     imageFiles: File[];
     sourceImagePreviewUrls: string[];
     setImageFiles: React.Dispatch<React.SetStateAction<File[]>>;
@@ -112,9 +107,6 @@ export function EditingForm({
     isLoading,
     currentMode,
     onModeChange,
-    isPasswordRequiredByBackend,
-    clientPasswordHash,
-    onOpenPasswordDialog,
     imageFiles,
     sourceImagePreviewUrls,
     setImageFiles,
@@ -458,16 +450,7 @@ export function EditingForm({
                 <div>
                     <div className='flex items-center'>
                         <CardTitle className='py-1 text-lg font-medium text-white'>编辑图像</CardTitle>
-                        {isPasswordRequiredByBackend && (
-                            <Button
-                                variant='ghost'
-                                size='icon'
-                                onClick={onOpenPasswordDialog}
-                                className='ml-2 text-white/60 hover:text-white'
-                                aria-label='配置密码'>
-                                {clientPasswordHash ? <Lock className='h-4 w-4' /> : <LockOpen className='h-4 w-4' />}
-                            </Button>
-                        )}
+                        {/* 密码配置按钮已移除 - 现在使用JWT令牌认证 */}
                     </div>
 
                 </div>
