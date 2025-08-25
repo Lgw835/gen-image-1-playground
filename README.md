@@ -1,9 +1,9 @@
-# <img src="./public/favicon.svg" alt="Project Logo" width="30" height="30" style="vertical-align: middle; margin-right: 8px;"> Gen-IMAGE-1 Playground
+# Gen-IMAGE-1 Playground
 
 一个基于Web的交互式平台，用于集成OpenAI的`gpt-image-1`模型，支持图像生成、编辑和高级功能。
 
 <p align="center">
-  <img src="./readme-images/interface.jpg" alt="应用界面" width="600"/>
+  <img src="https://s3.20250131.xyz/gh/usst-502s/welcome/2025/8/1756093005109-152.png" alt="应用界面" width="600"/>
 </p>
 
 ## ✨ 核心功能
@@ -35,11 +35,7 @@
 * **记录管理**: 支持删除历史记录
 
 <p align="center">
-  <img src="./readme-images/history.jpg" alt="历史记录界面" width="1306"/>
-</p>
-
-<p align="center">
-  <img src="./readme-images/cost-breakdown.jpg" alt="成本明细" width="350"/>
+  <img src="https://s3.20250131.xyz/gh/usst-502s/welcome/2025/8/1756093141082-597.png" alt="历史记录界面" width="1306"/>
 </p>
 
 ### 🚀 高级功能

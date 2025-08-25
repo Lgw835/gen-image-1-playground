@@ -25,7 +25,8 @@ import {
     HardDrive,
     Database,
     FileImage,
-    Trash2
+    Trash2,
+    Download
 } from 'lucide-react';
 import { formatPointsDisplay, convertUsdToPoints } from '@/lib/points-utils';
 import Image from 'next/image';
@@ -72,6 +73,7 @@ export function HistoryPanel({
     const [openPointsDialogTimestamp, setOpenPointsDialogTimestamp] = React.useState<number | null>(null);
     const [isTotalPointsDialogOpen, setIsTotalPointsDialogOpen] = React.useState(false);
     const [copiedTimestamp, setCopiedTimestamp] = React.useState<number | null>(null);
+    const [downloadingTimestamp, setDownloadingTimestamp] = React.useState<number | null>(null);
 
     const { totalPoints, totalImages } = React.useMemo(() => {
         let points = 0;
@@ -95,11 +97,83 @@ export function HistoryPanel({
     const handleCopy = async (text: string | null | undefined, timestamp: number) => {
         if (!text) return;
         try {
+            // 首先尝试使用现代剪贴板API
             await navigator.clipboard.writeText(text);
             setCopiedTimestamp(timestamp);
             setTimeout(() => setCopiedTimestamp(null), 1500);
         } catch (err) {
-            console.error('Failed to copy text: ', err);
+            console.error('Failed to copy text with Clipboard API:', err);
+            // 备用方案：使用传统方法
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                    setCopiedTimestamp(timestamp);
+                    setTimeout(() => setCopiedTimestamp(null), 1500);
+                } else {
+                    // 如果所有方法都失败，显示提示让用户手动复制
+                    alert(`复制失败，请手动复制以下内容：\n\n${text}`);
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback copy method also failed:', fallbackErr);
+                // 最后的备用方案：显示提示让用户手动复制
+                alert(`复制失败，请手动复制以下内容：\n\n${text}`);
+            }
+        }
+    };
+
+    const handleDownloadImage = async (item: HistoryMetadata) => {
+        try {
+            setDownloadingTimestamp(item.timestamp);
+            const firstImage = item.images?.[0];
+            if (!firstImage) return;
+
+            const originalStorageMode = item.storageModeUsed || 'fs';
+            let imageUrl: string | undefined;
+            
+            if (originalStorageMode === 'indexeddb') {
+                imageUrl = getImageSrc(firstImage.filename);
+            } else {
+                imageUrl = `/api/image/${firstImage.filename}`;
+            }
+
+            if (!imageUrl) {
+                console.error('Could not get image URL');
+                return;
+            }
+
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // 生成文件名：使用prompt的前30个字符 + 时间戳
+            const prompt = item.prompt || 'generated_image';
+            const sanitizedPrompt = prompt.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_').substring(0, 30);
+            const timestamp = new Date(item.timestamp).toISOString().replace(/[:.]/g, '-').substring(0, 19);
+            const outputFormat = item.output_format || 'png';
+            link.download = `${sanitizedPrompt}_${timestamp}.${outputFormat}`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download image:', err);
+        } finally {
+            setDownloadingTimestamp(null);
         }
     };
 
@@ -395,6 +469,19 @@ export function HistoryPanel({
                                                     </DialogFooter>
                                                 </DialogContent>
                                             </Dialog>
+                                            <Button
+                                                variant='outline'
+                                                size='sm'
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownloadImage(item);
+                                                }}
+                                                disabled={downloadingTimestamp === item.timestamp}
+                                                className='h-6 w-6 border-white/20 p-0 text-white/70 hover:bg-green-500/10 hover:text-green-400'
+                                                title='下载图片'
+                                                aria-label='下载图片'>
+                                                <Download size={14} />
+                                            </Button>
                                             <Dialog
                                                 open={itemPendingDeleteConfirmation?.timestamp === item.timestamp}
                                                 onOpenChange={(isOpen) => {

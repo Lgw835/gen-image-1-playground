@@ -22,7 +22,8 @@ import {
     Sparkles as SparklesIcon,
     Trash2,
     RefreshCw,
-    AlertCircle
+    AlertCircle,
+    Download
 } from 'lucide-react';
 import { formatPointsDisplay, convertUsdToPoints } from '@/lib/points-utils';
 import { getHistoryRecords, deleteGenerationRecord, type HistoryRecordItem, type HistoryResponse } from '@/lib/points-api';
@@ -38,9 +39,10 @@ export function ApiHistoryPanel({ onSelectImage }: ApiHistoryPanelProps) {
     const [historyData, setHistoryData] = useState<HistoryResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
     const [openPointsDialogId, setOpenPointsDialogId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     // 获取历史记录
     const fetchHistory = async () => {
@@ -87,14 +89,67 @@ export function ApiHistoryPanel({ onSelectImage }: ApiHistoryPanelProps) {
         }
     };
 
-    // 复制提示词
-    const handleCopyPrompt = async (prompt: string) => {
+    // 复制提示词 - 带备用方案
+    const handleCopyPrompt = async (prompt: string, itemId: string) => {
         try {
+            // 首先尝试使用现代剪贴板API
             await navigator.clipboard.writeText(prompt);
-            setCopiedPrompt(prompt);
-            setTimeout(() => setCopiedPrompt(null), 2000);
+            setCopiedId(itemId);
+            setTimeout(() => setCopiedId(null), 2000);
         } catch (err) {
-            console.error('Failed to copy prompt:', err);
+            console.error('Failed to copy prompt with Clipboard API:', err);
+            // 备用方案：使用传统方法
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = prompt;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                    setCopiedId(itemId);
+                    setTimeout(() => setCopiedId(null), 2000);
+                } else {
+                    // 如果所有方法都失败，显示提示让用户手动复制
+                    alert(`复制失败，请手动复制以下内容：\n\n${prompt}`);
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback copy method also failed:', fallbackErr);
+                // 最后的备用方案：显示提示让用户手动复制
+                alert(`复制失败，请手动复制以下内容：\n\n${prompt}`);
+            }
+        }
+    };
+
+    const handleDownloadImage = async (imageUrl: string, prompt: string, itemId: string) => {
+        try {
+            setDownloadingId(itemId);
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error('Failed to fetch image');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // 生成文件名：使用prompt的前30个字符 + 时间戳
+            const sanitizedPrompt = prompt.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_').substring(0, 30);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+            link.download = `${sanitizedPrompt}_${timestamp}.png`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download image:', err);
+        } finally {
+            setDownloadingId(null);
         }
     };
 
@@ -267,15 +322,26 @@ export function ApiHistoryPanel({ onSelectImage }: ApiHistoryPanelProps) {
                                             <Button
                                                 variant='ghost'
                                                 size='sm'
-                                                onClick={() => handleCopyPrompt(item.prompt)}
+                                                onClick={() => handleCopyPrompt(item.prompt, item.id)}
                                                 className='h-6 w-6 p-0 text-neutral-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition-all duration-200'
                                                 title='复制提示词'
                                             >
-                                                {copiedPrompt === item.prompt ? (
+                                                {copiedId === item.id ? (
                                                     <Check size={12} />
                                                 ) : (
                                                     <Copy size={12} />
                                                 )}
+                                            </Button>
+
+                                            <Button
+                                                variant='ghost'
+                                                size='sm'
+                                                onClick={() => handleDownloadImage(item.image_urls[0], item.prompt, item.id)}
+                                                disabled={downloadingId === item.id || !item.image_urls[0]}
+                                                className='h-6 w-6 p-0 text-neutral-400 hover:text-green-400 hover:bg-green-500/10 rounded-md transition-all duration-200'
+                                                title='下载图片'
+                                            >
+                                                <Download size={12} />
                                             </Button>
 
                                             <Button
