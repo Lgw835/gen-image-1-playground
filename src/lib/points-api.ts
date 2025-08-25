@@ -4,7 +4,18 @@
  */
 
 // 管理后台URL，从环境变量获取，默认为localhost:8000
-const ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:8000';
+let ADMIN_URL = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:8000';
+
+// 调试信息：输出环境变量值
+console.log('NEXT_PUBLIC_ADMIN_URL from env:', process.env.NEXT_PUBLIC_ADMIN_URL);
+
+// 确保URL包含协议
+if (ADMIN_URL && !ADMIN_URL.startsWith('http://') && !ADMIN_URL.startsWith('https://')) {
+    ADMIN_URL = `https://${ADMIN_URL}`;
+    console.log('Added https:// protocol to ADMIN_URL');
+}
+
+console.log('Final ADMIN_URL:', ADMIN_URL);
 
 export interface PointsBalance {
     user_id: number;

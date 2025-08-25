@@ -73,7 +73,7 @@
 ## 配置要求
 
 ### 环境变量
-- `ADMIN_URL`: 后端管理系统地址（默认: http://localhost:8000）
+- `NEXT_PUBLIC_ADMIN_URL`: 后端管理系统地址（默认: http://localhost:8000）
 - `OPENAI_API_KEY`: OpenAI API密钥
 
 ### 后端API接口
