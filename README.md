@@ -1,9 +1,9 @@
-# <img src="./public/favicon.svg" alt="Project Logo" width="30" height="30" style="vertical-align: middle; margin-right: 8px;"> GPT-IMAGE-1 Playground
+# <img src="./public/favicon.svg" alt="Project Logo" width="30" height="30" style="vertical-align: middle; margin-right: 8px;"> Gen-IMAGE-1 Playground
 
-一个基于Web的交互式平台，用于体验OpenAI的`gpt-image-1`模型，支持图像生成、编辑和高级功能。
+一个基于Web的交互式平台，用于集成OpenAI的`gpt-image-1`模型，支持图像生成、编辑和高级功能。
 
 <p align="center">
-  <img src="./readme-images/interface.jpg" alt="Interface" width="600"/>
+  <img src="./readme-images/interface.jpg" alt="应用界面" width="600"/>
 </p>
 
 ## ✨ 核心功能
@@ -77,7 +77,7 @@
 
 🚨 **警告**: 从`main`或`master`分支部署时，您的Vercel部署将对任何拥有URL的人公开可用。从其他分支部署需要用户登录Vercel（您的团队）才能访问预览版本。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/alasano/gpt-image-1-playground&env=OPENAI_API_KEY,APP_PASSWORD&envDescription=OpenAI%20API%20Key%20is%20required.%20Images%20are%20stored%20on%20the%20server%20and%20cloud%20storage.&project-name=gpt-image-playground&repository-name=gpt-image-playground)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Lgw835/gen-image-1-playground&env=OPENAI_API_KEY,APP_PASSWORD&envDescription=OpenAI%20API%20Key%20is%20required.%20Images%20are%20stored%20on%20the%20server%20and%20cloud%20storage.&project-name=gen-image-1-playground&repository-name=gen-image-1-playground)
 
 部署过程中会提示您输入`OPENAI_API_KEY`和`APP_PASSWORD`。应用程序会自动处理Vercel serverless环境下的图像存储。
 
@@ -116,8 +116,8 @@
 
 #### 1. 克隆项目
 ```bash
-git clone https://github.com/alasano/gpt-image-1-playground.git
-cd gpt-image-1-playground
+git clone https://github.com/Lgw835/gen-image-1-playground.git
+cd gen-image-1-playground
 ```
 
 #### 2. 安装依赖
@@ -257,14 +257,12 @@ HTTPS_PROXY=https://proxy-server:port
 
 ## 📞 支持与反馈
 
-* **问题报告**: [GitHub Issues](https://github.com/alasano/gpt-image-1-playground/issues)
-* **功能请求**: [GitHub Discussions](https://github.com/alasano/gpt-image-1-playground/discussions)
-* **文档**: [项目Wiki](https://github.com/alasano/gpt-image-1-playground/wiki)
+* **问题报告**: [GitHub Issues](https://github.com/Lgw835/gen-image-1-playground/issues)
+* **功能请求**: [GitHub Discussions](https://github.com/Lgw835/gen-image-1-playground/discussions)
+* **文档**: [项目Wiki](https://github.com/Lgw835/gen-image-1-playground/wiki)
 
 ---
 
 <p align="center">
   <strong>⭐ 如果这个项目对您有帮助，请给我们一个星标！</strong>
 </p>
-#   g e n - i m a g e - 1 - p l a y g r o u n d  
- 
