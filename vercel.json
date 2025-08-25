@@ -1,8 +1,11 @@
 {
   "version": 2,
-
-
-
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "SKIP_ENV_VALIDATION": "true"
+  },
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
