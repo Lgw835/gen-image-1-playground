@@ -4,11 +4,6 @@ const nextConfig: NextConfig = {
   /* config options here */
   devIndicators: false, // 隐藏左下角的Next.js开发工具按钮
   
-  // 忽略ESLint错误，允许构建继续
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
   // 忽略TypeScript错误，允许构建继续
   typescript: {
     ignoreBuildErrors: true,

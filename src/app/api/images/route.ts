@@ -4,21 +4,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import path from 'path';
 
-// 配置代理和超时设置
-const openaiConfig: any = {
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_API_BASE_URL,
-    timeout: 120000, // 2分钟超时
-};
+// 惰性初始化 OpenAI 客户端，避免构建时报错
+let openaiClient: OpenAI | null = null;
 
-// 如果设置了代理，添加代理配置
-if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
-    const { HttpsProxyAgent } = require('https-proxy-agent');
-    const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-    openaiConfig.httpAgent = new HttpsProxyAgent(proxyUrl);
+function getOpenAIClient(): OpenAI {
+    if (!openaiClient) {
+        // 配置代理和超时设置
+        const openaiConfig: any = {
+            apiKey: process.env.OPENAI_API_KEY,
+            baseURL: process.env.OPENAI_API_BASE_URL,
+            timeout: 120000, // 2分钟超时
+        };
+
+        // 如果设置了代理，添加代理配置
+        if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
+            const { HttpsProxyAgent } = require('https-proxy-agent');
+            const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+            openaiConfig.httpAgent = new HttpsProxyAgent(proxyUrl);
+        }
+
+        openaiClient = new OpenAI(openaiConfig);
+    }
+    return openaiClient;
 }
-
-const openai = new OpenAI(openaiConfig);
 
 const outputDir = path.resolve(process.cwd(), 'generated-images');
 
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
             }
 
             console.log('Calling OpenAI generate with params:', params);
-            result = await openai.images.generate(params);
+            result = await getOpenAIClient().images.generate(params);
         } else if (mode === 'edit') {
             const n = parseInt((formData.get('n') as string) || '1', 10);
             const size = (formData.get('size') as OpenAI.Images.ImageEditParams['size']) || 'auto';
@@ -180,7 +188,7 @@ export async function POST(request: NextRequest) {
                 image: `[${imageFiles.map((f) => f.name).join(', ')}]`,
                 mask: maskFile ? maskFile.name : 'N/A'
             });
-            result = await openai.images.edit(params);
+            result = await getOpenAIClient().images.edit(params);
         } else {
             return NextResponse.json({ error: 'Invalid mode specified' }, { status: 400 });
         }
